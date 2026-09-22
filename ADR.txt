@@ -1,0 +1,63 @@
+Título
+
+Essa decisão define o problema, as ferramentas de paralelismo e a abordagem de implementação usados no Trabalho 1 de Paralelismo com Memória Compartilhada.
+
+Status
+
+Aceito
+
+Data
+
+2026-09-21
+
+Contexto
+
+O trabalho exige a aplicação de uma forma de paralelismo com memória compartilhada (Fork, Pthreads ou OpenMP) sobre um problema à escolha do grupo, podendo ser um cálculo matemático ou o processamento de um CSV. Optou-se por unir as duas possibilidades: um problema de Álgebra Linear Aplicada (multiplicação de matrizes) com entrada de dados via arquivos CSV. É necessário também comparar o desempenho entre diferentes abordagens de paralelismo e justificar as decisões de implementação tomadas.
+
+Decisão
+
+Usamos multiplicação de matrizes (matriz × matriz) como problema do trabalho, implementada em três versões paralelas (Fork, Pthreads e OpenMP) mais uma versão sequencial de base, seguindo os pontos abaixo:
+
+* O problema escolhido é a multiplicação de matrizes (C = A × B), por ser a operação de maior custo computacional entre as consideradas (soma, transposição e multiplicação matriz-vetor têm custo O(N²); multiplicação de matrizes tem custo O(N³)), o que torna o ganho do paralelismo mais evidente nos testes de desempenho.
+* Cada ferramenta de paralelismo (Fork, Pthreads, OpenMP) é implementada em um arquivo de código-fonte separado, além de um quarto arquivo com a versão sequencial, que serve de base de comparação. A versão sequencial não é duplicada dentro dos três arquivos paralelos, pois o algoritmo sequencial não varia entre as comparações.
+* As matrizes de entrada são lidas de arquivos CSV (sem cabeçalho, valores separados por vírgula). O tamanho da matriz não é fixado no código: é determinado dinamicamente durante a leitura do CSV.
+* O trabalho é restrito a matrizes quadradas (N×N). Essa restrição simplifica a validação de compatibilidade dimensional exigida pela multiplicação (número de colunas de A igual ao número de linhas de B), que ainda assim é verificada pelo programa antes do cálculo, com erro reportado caso as matrizes não sejam compatíveis.
+* Cada versão grava seu resultado em um arquivo CSV próprio (`resultado_sequencial.csv`, `resultado_fork.csv`, `resultado_pthreads.csv`, `resultado_openmp.csv`) e imprime, ao final da execução, o tempo de execução medido apenas na etapa de multiplicação (excluindo a leitura do CSV), para manter a comparação justa entre as quatro versões.
+* [SUPERADO por 0.3, ver abaixo] A corretude dos resultados era verificada por um script em Python (`prova_real.py`), que calculava a multiplicação de referência com numpy e comparava com o resultado de cada CSV gerado pelas versões em C, com tolerância para diferenças de arredondamento em ponto flutuante.
+* A comparação de desempenho entre Sequencial, Fork, Pthreads e OpenMP é feita manualmente, com base nas métricas impressas por cada execução, sem necessidade de um script automatizado de comparação.
+* A divisão do trabalho entre threads/processos é feita por linha, em blocos contíguos: com P threads/processos e N linhas em C, cada worker calcula um bloco de linhas seguidas (ex.: N=100, P=4 → linhas 0–24, 25–49, 50–74, 75–99). Essa escolha evita conflito de escrita entre workers (cada um escreve em linhas distintas da matriz resultado) e mantém boa localidade de cache, sem a complexidade de um particionamento 2D em blocos, desnecessária para o escopo do trabalho. Na versão Fork, a matriz resultado é alocada em memória compartilhada (mmap) antes dos fork()s, para que os processos filhos escrevam diretamente nela.
+* Os testes de desempenho usam N = 200, 500 e 1000, além dos tamanhos pequenos (2×2, 3×3, 4×4) já usados na verificação de corretude.
+* A verificação de corretude deixa de depender de `prova_real.py` (numpy) como referência externa. Em vez disso, é feita por um comparador em C que também usa paralelismo: lê os 4 arquivos `resultado_*.csv`, divide as linhas em chunks e compara os valores entre as quatro versões (linha a linha, célula a célula), reportando qualquer inconsistência encontrada. Esse comparador também é implementado nas três formas de paralelismo (Fork, Pthreads, OpenMP), reaproveitando as mesmas técnicas usadas na multiplicação, e mede seu próprio tempo de execução.
+
+Pendente (a definir e atualizar nesta ADR):
+
+* Implementação do comparador paralelo dos 4 CSVs de resultado (arquivo(s) de código-fonte, forma de divisão em chunks, critério de "inconsistência").
+
+Consequências
+
+Positivo:
+
+* Implementar a mesma operação nas três ferramentas permite uma comparação direta e justa de desempenho entre Fork, Pthreads e OpenMP, além de uma base sequencial.
+* A separação em arquivos por método deixa explícitas, para quem lê o código, as diferenças de implementação entre as três abordagens de paralelismo com memória compartilhada.
+* O uso de CSV como entrada e saída, combinado com o script de verificação em Python, garante confiabilidade dos resultados sem depender de conferência manual, o que é especialmente relevante para as matrizes maiores usadas nos testes de desempenho.
+
+Negativo:
+
+* Restringir o trabalho a matrizes quadradas simplifica a validação, mas reduz a generalidade do programa, que não trata multiplicação entre matrizes retangulares.
+* Implementar três versões paralelas, em vez de uma só, aumenta o esforço e o tempo de desenvolvimento em relação a um trabalho com uma única ferramenta de paralelismo.
+* A comparação de desempenho feita manualmente (sem script automatizado) depende de organização cuidadosa dos dados coletados durante os testes, para não haver erro na hora de comparar na apresentação.
+
+Conformidade
+
+* Cada uma das quatro versões (sequencial, fork, pthreads, openmp) deve compilar e executar de forma independente, lendo o tamanho da matriz dinamicamente a partir do CSV de entrada.
+* Cada versão deve gravar seu resultado em um CSV próprio e imprimir o tempo de execução medido apenas na etapa de multiplicação.
+* O comparador paralelo dos 4 CSVs de resultado deve confirmar a corretude (consistência entre as 4 versões) antes de qualquer medição de desempenho ser considerada válida para a comparação.
+
+Observações
+
+* Autor: Erik
+* Versão: 0.3
+* Changelog:
+   * 0.1: versão inicial proposta, com decisões sobre problema, ferramentas, entrada/saída de dados e verificação de corretude. Estratégia de divisão de trabalho e tamanhos de matriz para os testes ainda pendentes.
+   * 0.2: decididos os pontos pendentes: divisão do trabalho por linha (blocos contíguos) e tamanhos de teste N = 200, 500, 1000. Confirmado grupo de 1 integrante.
+   * 0.3: verificação de corretude deixa de usar `prova_real.py`/numpy como referência externa; passa a ser um comparador em C, também paralelo (Fork/Pthreads/OpenMP), que compara os 4 `resultado_*.csv` entre si em chunks de linhas. Implementação desse comparador ainda pendente.
