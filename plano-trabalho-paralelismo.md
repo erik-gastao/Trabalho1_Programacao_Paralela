@@ -34,15 +34,16 @@ Cada método terá seu **próprio arquivo de código-fonte** (sequencial, Fork, 
 
 Divisão **por linha, em blocos contíguos**: com P threads/processos e N linhas na matriz resultado, cada worker calcula um bloco de linhas seguidas (ex.: N=100, P=4 → linhas 0–24, 25–49, 50–74, 75–99). Evita conflito de escrita (cada worker escreve em linhas distintas) e mantém boa localidade de cache, sem a complexidade extra de um particionamento em blocos 2D. Na versão Fork, a matriz resultado fica em memória compartilhada (mmap), alocada antes dos `fork()`s.
 
-## Verificação de corretude ("prova real")
+## Verificação de corretude (comparador paralelo)
 
-Além das métricas de tempo, haverá um script em Python (`prova_real.py`) para conferir se os resultados calculados pelas quatro versões em C estão matematicamente corretos:
+Além das métricas de tempo, um comparador em C, também paralelo, confere se as quatro versões chegaram ao mesmo resultado:
 
-- Lê as matrizes de entrada (`matriz_a.csv`, `matriz_b.csv`) e calcula a multiplicação de referência usando numpy.
-- Lê o CSV de resultado de cada versão em C e compara com a referência (com tolerância para diferenças de arredondamento em ponto flutuante).
-- Reporta, para cada método, se o resultado está correto, divergente, com dimensão errada, ou se o arquivo não foi encontrado.
+- Toma `resultado_sequencial.csv` como referência e compara `resultado_fork.csv`, `resultado_pthreads.csv` e `resultado_openmp.csv` contra ela, célula a célula (tolerância 1e-9 relativa + absoluta).
+- As linhas são divididas em blocos contíguos entre os workers, igual à multiplicação; cada worker conta as divergências do seu bloco e as contagens são juntadas no final.
+- Implementado nas três ferramentas: `comp_fork.c` (contagens voltam por mmap), `comp_pthreads.c` (junção manual após join), `comp_openmp.c` (cláusula `reduction`). Parte comum em `comparador.h`/`comparador.c`.
+- Reporta, para cada método: OK, divergente (quantas células e a primeira), dimensão errada ou arquivo não encontrado. Mede o próprio tempo de comparação.
 
-Essa verificação será usada principalmente com matrizes pequenas (2×2, 3×3, 4×4), enquanto os testes de desempenho serão feitos com matrizes maiores: N = 200, 500 e 1000.
+Os testes de desempenho são feitos com N = 300, 500, 1000, 1500 e 2000; o comparador deve dar "consistente" em cada N antes de os tempos serem considerados válidos.
 
 ## Comparação a ser feita
 
@@ -53,7 +54,7 @@ Essa verificação será usada principalmente com matrizes pequenas (2×2, 3×3,
 
 ## Entregáveis
 
-1. Todos os arquivos de código-fonte (as quatro versões: sequencial, Fork, Pthreads, OpenMP)
+1. Todos os arquivos de código-fonte (as quatro versões: sequencial, Fork, Pthreads, OpenMP, e o comparador paralelo nas três ferramentas)
 2. Slides (se houver apresentação)
 3. ADR (Architecture Decision Record) documentando as decisões de implementação, incluindo:
    - Escolha do problema (multiplicação de matrizes) e justificativa
@@ -64,5 +65,7 @@ Essa verificação será usada principalmente com matrizes pequenas (2×2, 3×3,
 ## Pontos decididos
 
 - [x] Estratégia de divisão do trabalho: por linha, em blocos contíguos (ver seção "Ferramentas de paralelismo")
-- [x] Tamanhos (N) de matriz para os testes de desempenho: 200, 500, 1000
+- [x] Tamanhos (N) de matriz para os testes de desempenho: 300, 500, 1000, 1500, 2000
+- [x] Quantidade de workers nos testes: 1 (sequencial), 2, 4, 8, 16 processos/threads (pedido no terminal ao executar)
+- [x] Verificação de corretude: comparador paralelo em C (ver seção "Verificação de corretude")
 - [x] Grupo: 1 integrante (Erik)

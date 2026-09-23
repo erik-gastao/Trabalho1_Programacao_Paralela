@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -34,16 +36,20 @@ int main(void) {
     }
 
     struct timespec inicio, fim;
-    timespec_get(&inicio, TIME_UTC);
+    clock_gettime(CLOCK_MONOTONIC, &inicio);
     Matriz c = multiplicar(a, b);
-    timespec_get(&fim, TIME_UTC);
+    clock_gettime(CLOCK_MONOTONIC, &fim);
 
     double tempo_segundos = (fim.tv_sec - inicio.tv_sec) +
                              (fim.tv_nsec - inicio.tv_nsec) / 1e9;
 
-    escrever_matriz_csv("resultado_sequencial.csv", c);
     printf("Sequencial: %dx%d * %dx%d -> tempo de multiplicacao: %.6f s\n",
            a.linhas, a.colunas, b.linhas, b.colunas, tempo_segundos);
+    printf("Sequencial: escrevendo resultado...\n");
+
+    escrever_matriz_csv("resultado_sequencial.csv", c);
+
+    printf("Sequencial: resultado escrito em 'resultado_sequencial.csv'\n");
 
     liberar_matriz(a);
     liberar_matriz(b);

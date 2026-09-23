@@ -18,14 +18,14 @@ Pergunta:
 Tamanho das matrizes:
 ```
 
-Digitar um número inteiro (ex.: `200`) e apertar Enter.
+Digitar um número inteiro (ex.: `300`) e apertar Enter.
 
 ### Exemplo
 
 ```
 $ wsl python3 gerar_matriz.py
-Tamanho das matrizes: 200
-matriz_a.csv e matriz_b.csv geradas: 200x200, valores aleatorios de 0 a 99
+Tamanho das matrizes: 300
+matriz_a.csv e matriz_b.csv geradas: 300x300, valores aleatorios de 0 a 99
 ```
 
 Como as matrizes são sempre quadradas (N×N) neste trabalho e as duas saem com o mesmo N na mesma execução, a compatibilidade pra multiplicação (colunas de A = linhas de B) já sai garantida — não precisa se preocupar em digitar tamanhos diferentes.
@@ -40,7 +40,7 @@ Abrir `matriz_a.csv`/`matriz_b.csv` num editor de texto e digitar os valores: um
 4,8,2
 ```
 
-Útil pra matrizes pequenas de teste (2×2, 3×3, 4×4) usadas na verificação de corretude com `prova_real.py`. Pros testes de desempenho (N grande: 200, 500, 1000), usar a Opção 1.
+Útil pra matrizes pequenas de teste (2×2, 3×3, 4×4), conferíveis de cabeça. Pros testes de desempenho (N = 300, 500, 1000, 1500, 2000), usar a Opção 1.
 
 ## Depois de gerar
 

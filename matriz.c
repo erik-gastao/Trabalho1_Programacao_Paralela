@@ -112,7 +112,91 @@ void escrever_matriz_csv(const char *caminho, Matriz m) {
     fclose(arquivo);
 }
 
+/* Escreve so as linhas [linha_inicio, linha_fim) de m num arquivo proprio.
+   Usado pelas versoes paralelas: cada processo/thread grava sua parte num
+   arquivo separado (sem disputa de lock), concatenados depois. */
+void escrever_bloco_csv(const char *caminho, Matriz m, int linha_inicio, int linha_fim) {
+    FILE *arquivo = fopen(caminho, "w");
+    if (!arquivo) {
+        fprintf(stderr, "Erro ao criar '%s': %s\n", caminho, strerror(errno));
+        exit(1);
+    }
+    for (int i = linha_inicio; i < linha_fim; i++) {
+        for (int j = 0; j < m.colunas; j++) {
+            fprintf(arquivo, "%.10g", m.dados[i][j]);
+            if (j + 1 < m.colunas) fputc(',', arquivo);
+        }
+        fputc('\n', arquivo);
+    }
+    fclose(arquivo);
+}
+
+/* Concatena 'quantidade' arquivos "<prefixo>.part0", "<prefixo>.part1", ...
+   no arquivo final 'caminho', na ordem, e apaga as partes. */
+void concatenar_partes_csv(const char *caminho, const char *prefixo, int quantidade) {
+    FILE *destino = fopen(caminho, "w");
+    if (!destino) {
+        fprintf(stderr, "Erro ao criar '%s': %s\n", caminho, strerror(errno));
+        exit(1);
+    }
+
+    char nome_parte[512];
+    char buffer[65536];
+    for (int p = 0; p < quantidade; p++) {
+        snprintf(nome_parte, sizeof(nome_parte), "%s.part%d", prefixo, p);
+
+        FILE *parte = fopen(nome_parte, "r");
+        if (!parte) {
+            fprintf(stderr, "Erro ao abrir '%s': %s\n", nome_parte, strerror(errno));
+            exit(1);
+        }
+
+        size_t lidos;
+        while ((lidos = fread(buffer, 1, sizeof(buffer), parte)) > 0) {
+            fwrite(buffer, 1, lidos, destino);
+        }
+        fclose(parte);
+        remove(nome_parte);
+    }
+    fclose(destino);
+}
+
 void liberar_matriz(Matriz m) {
     for (int i = 0; i < m.linhas; i++) free(m.dados[i]);
     free(m.dados);
+}
+
+#define MAX_WORKERS 1024
+
+/* Numero de processos/threads ('nome' so aparece na pergunta).
+   Se veio como argumento (ex.: ./cod_openmp 4), usa ele sem perguntar;
+   senao pergunta no terminal. Enter vazio (ou fim da entrada) usa 'padrao'.
+   Os programas chamam isto antes de ler os CSVs, fora da medicao de tempo:
+   a espera pela digitacao nao entra no tempo medido. */
+int ler_num_workers(int argc, char *argv[], const char *nome, int padrao) {
+    if (argc > 1) {
+        int n = atoi(argv[1]);
+        return n >= 1 ? n : 1;
+    }
+
+    char entrada[64];
+    for (;;) {
+        printf("Numero de %s (Enter = %d): ", nome, padrao);
+        fflush(stdout);
+        if (!fgets(entrada, sizeof(entrada), stdin)) {
+            printf("\n");
+            return padrao;
+        }
+
+        char *p = entrada;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == '\n' || *p == '\r' || *p == '\0') return padrao;
+
+        char *fim;
+        long n = strtol(p, &fim, 10);
+        while (*fim == ' ' || *fim == '\t' || *fim == '\n' || *fim == '\r') fim++;
+        if (fim != p && *fim == '\0' && n >= 1 && n <= MAX_WORKERS) return (int)n;
+
+        printf("Valor invalido: digite um inteiro entre 1 e %d.\n", MAX_WORKERS);
+    }
 }
