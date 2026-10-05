@@ -14,4 +14,10 @@ void concatenar_partes_csv(const char *caminho, const char *prefixo, int quantid
 void liberar_matriz(Matriz m);
 int ler_num_workers(int argc, char *argv[], const char *nome, int padrao);
 
+/* Afinidade de CPU: preparar_afinidade() le a topologia uma vez (chamar
+   antes da medicao de tempo); fixar_worker(w) trava a thread/processo que
+   chama no nucleo do worker w. */
+void preparar_afinidade(void);
+void fixar_worker(int worker);
+
 #endif

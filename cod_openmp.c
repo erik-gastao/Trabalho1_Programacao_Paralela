@@ -55,24 +55,32 @@ int main(int argc, char *argv[]) {
     omp_set_num_threads(num_threads);
 
     int threads_usadas = 1;
+    preparar_afinidade();
 
     struct timespec inicio, fim;
     clock_gettime(CLOCK_MONOTONIC, &inicio);
 
-    /* schedule(static) sem chunk: divide as linhas em blocos contiguos,
-       um por thread -- mesma estrategia de divisao usada no fork e no pthreads. */
-    #pragma omp parallel for schedule(static)
-    for (int i = 0; i < c.linhas; i++) {
-        /* Numero real de threads do time (pode ser menor que o pedido se
-           OMP_DYNAMIC/OMP_THREAD_LIMIT estiverem ativos). So a thread que
-           pega a linha 0 escreve, e a leitura e depois da barreira. */
-        if (i == 0) threads_usadas = omp_get_num_threads();
+    #pragma omp parallel
+    {
+        /* Cada thread se trava no seu nucleo antes de calcular, como no
+           pthreads e no fork. */
+        fixar_worker(omp_get_thread_num());
 
-        for (int j = 0; j < c.colunas; j++) c.dados[i][j] = 0.0;
-        for (int k = 0; k < a.colunas; k++) {
-            double valor_a = a.dados[i][k];
-            for (int j = 0; j < c.colunas; j++) {
-                c.dados[i][j] += valor_a * b.dados[k][j];
+        /* schedule(static) sem chunk: divide as linhas em blocos contiguos,
+           um por thread -- mesma estrategia de divisao usada no fork e no pthreads. */
+        #pragma omp for schedule(static)
+        for (int i = 0; i < c.linhas; i++) {
+            /* Numero real de threads do time (pode ser menor que o pedido se
+               OMP_DYNAMIC/OMP_THREAD_LIMIT estiverem ativos). So a thread que
+               pega a linha 0 escreve, e a leitura e depois da barreira. */
+            if (i == 0) threads_usadas = omp_get_num_threads();
+
+            for (int j = 0; j < c.colunas; j++) c.dados[i][j] = 0.0;
+            for (int k = 0; k < a.colunas; k++) {
+                double valor_a = a.dados[i][k];
+                for (int j = 0; j < c.colunas; j++) {
+                    c.dados[i][j] += valor_a * b.dados[k][j];
+                }
             }
         }
     }

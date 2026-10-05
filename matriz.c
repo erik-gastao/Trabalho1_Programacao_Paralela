@@ -1,7 +1,12 @@
+/* _GNU_SOURCE: libera sched_setaffinity/CPU_SET (afinidade de CPU). */
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sched.h>
+#include <unistd.h>
 #include "matriz.h"
 
 #define TAM_INICIAL_LINHA 256
@@ -199,4 +204,64 @@ int ler_num_workers(int argc, char *argv[], const char *nome, int padrao) {
 
         printf("Valor invalido: digite um inteiro entre 1 e %d.\n", MAX_WORKERS);
     }
+}
+
+/* ---- Afinidade: travar cada worker num nucleo fixo ----
+
+   Sem isto, o escalonador do Linux pode mover threads/processos de um
+   nucleo pro outro no meio do calculo (perdendo a cache L1/L2 daquele
+   nucleo) ou colocar dois workers no mesmo nucleo fisico enquanto outro
+   fica livre. Isso faz o tempo variar bastante entre execucoes.
+
+   Ordem dos nucleos: primeiro uma CPU logica de cada nucleo fisico, depois
+   as "irmas" de SMT (hyperthreading). Ex.: Ryzen 8 nucleos/16 threads,
+   irmas (0,1), (2,3)... -> ordem 0,2,4,...,14, 1,3,...,15. Assim, com ate
+   8 workers cada um fica sozinho num nucleo fisico. A topologia e lida de
+   /sys; se nao der, usa a numeracao direta 0,1,2,... */
+
+static int ordem_nucleos[MAX_WORKERS];
+static int total_nucleos = 0;
+
+/* Primeira CPU listada em thread_siblings_list (ex.: "2-3" -> 2), ou -1. */
+static int primeira_irma(int cpu) {
+    char caminho[96];
+    snprintf(caminho, sizeof(caminho),
+             "/sys/devices/system/cpu/cpu%d/topology/thread_siblings_list", cpu);
+    FILE *arquivo = fopen(caminho, "r");
+    if (!arquivo) return -1;
+    int primeira = -1;
+    if (fscanf(arquivo, "%d", &primeira) != 1) primeira = -1;
+    fclose(arquivo);
+    return primeira;
+}
+
+void preparar_afinidade(void) {
+    long n = sysconf(_SC_NPROCESSORS_ONLN);
+    if (n < 1) n = 1;
+    if (n > MAX_WORKERS) n = MAX_WORKERS;
+
+    int principal[MAX_WORKERS];
+    int topologia_ok = 1;
+    for (int cpu = 0; cpu < n; cpu++) {
+        int irma = primeira_irma(cpu);
+        if (irma < 0) topologia_ok = 0;
+        principal[cpu] = (irma == cpu);
+    }
+
+    total_nucleos = 0;
+    if (topologia_ok) {
+        for (int cpu = 0; cpu < n; cpu++) if (principal[cpu]) ordem_nucleos[total_nucleos++] = cpu;
+        for (int cpu = 0; cpu < n; cpu++) if (!principal[cpu]) ordem_nucleos[total_nucleos++] = cpu;
+    } else {
+        for (int cpu = 0; cpu < n; cpu++) ordem_nucleos[total_nucleos++] = cpu;
+    }
+}
+
+void fixar_worker(int worker) {
+    if (total_nucleos == 0) return;   /* preparar_afinidade nao foi chamada */
+    cpu_set_t conjunto;
+    CPU_ZERO(&conjunto);
+    CPU_SET(ordem_nucleos[worker % total_nucleos], &conjunto);
+    /* pid 0 = a thread/processo que chamou. Se falhar, segue sem travar. */
+    sched_setaffinity(0, sizeof(conjunto), &conjunto);
 }

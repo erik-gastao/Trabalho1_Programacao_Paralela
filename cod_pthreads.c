@@ -14,6 +14,7 @@ typedef struct {
     Matriz c;
     int linha_inicio;
     int linha_fim;
+    int indice;   /* numero do worker, define o nucleo onde a thread trava */
 } TarefaThread;
 
 typedef struct {
@@ -28,6 +29,7 @@ typedef struct {
 static void *multiplicar_bloco(void *arg) {
     TarefaThread *tarefa = (TarefaThread *)arg;
     Matriz a = tarefa->a, b = tarefa->b, c = tarefa->c;
+    fixar_worker(tarefa->indice);
 
     for (int i = tarefa->linha_inicio; i < tarefa->linha_fim; i++) {
         for (int j = 0; j < c.colunas; j++) c.dados[i][j] = 0.0;
@@ -98,6 +100,7 @@ int main(int argc, char *argv[]) {
 
     int linhas_por_thread = c.linhas / num_threads;
     int resto = c.linhas % num_threads;
+    preparar_afinidade();
 
     struct timespec inicio, fim;
     clock_gettime(CLOCK_MONOTONIC, &inicio);
@@ -109,6 +112,7 @@ int main(int argc, char *argv[]) {
             .a = a, .b = b, .c = c,
             .linha_inicio = linha_atual,
             .linha_fim = linha_atual + tamanho_bloco,
+            .indice = t,
         };
         linha_atual += tamanho_bloco;
 

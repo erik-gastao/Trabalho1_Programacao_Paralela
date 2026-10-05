@@ -1,0 +1,17 @@
+# Saida da bateria de testes (rodar_testes.sh)
+testes/
+
+# Binarios compilados (gerados a partir dos .c, ver manual-rodar.md)
+cod_sequencial
+cod_fork
+cod_pthreads
+cod_openmp
+comp_sequencial
+comp_fork
+comp_pthreads
+comp_openmp
+*_o0
+
+# Resultados gerados pelas execucoes
+resultado_*.csv
+*.part[0-9]*

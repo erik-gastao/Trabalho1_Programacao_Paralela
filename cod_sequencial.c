@@ -35,6 +35,11 @@ int main(void) {
         return 1;
     }
 
+    /* Trava no primeiro nucleo, igual ao worker 0 das versoes paralelas,
+       pra o escalonador nao migrar o calculo entre nucleos. */
+    preparar_afinidade();
+    fixar_worker(0);
+
     struct timespec inicio, fim;
     clock_gettime(CLOCK_MONOTONIC, &inicio);
     Matriz c = multiplicar(a, b);

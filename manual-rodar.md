@@ -58,7 +58,13 @@ wsl gcc -std=c11 -Wall -Wextra -O2 -pthread -o comp_pthreads comp_pthreads.c com
 wsl gcc -std=c11 -Wall -Wextra -O2 -fopenmp -o comp_openmp comp_openmp.c comparador.c matriz.c
 ```
 
-Os arquivos de código-fonte usam o prefixo `cod_` (`cod_sequencial.c`, `cod_fork.c`, `cod_pthreads.c`, `cod_openmp.c`) pra ficarem visivelmente agrupados no `ls`, separados de `matriz.c`/`matriz.h` (módulo de I/O compartilhado) e dos scripts Python. O comparador usa o prefixo `comp_` (`comp_fork.c`, `comp_pthreads.c`, `comp_openmp.c`), com a parte comum em `comparador.c`/`comparador.h`. Os binários compilados mantêm o mesmo prefixo. Gera binários ELF, só rodam dentro do WSL (não dá duplo-clique no Windows).
+Comparador sequencial (mesma comparação, sem paralelismo; baseline de tempo dos comparadores):
+
+```
+wsl gcc -std=c11 -Wall -Wextra -O2 -o comp_sequencial comp_sequencial.c comparador.c matriz.c
+```
+
+Os arquivos de código-fonte usam o prefixo `cod_` (`cod_sequencial.c`, `cod_fork.c`, `cod_pthreads.c`, `cod_openmp.c`) pra ficarem visivelmente agrupados no `ls`, separados de `matriz.c`/`matriz.h` (módulo de I/O compartilhado) e dos scripts Python. O comparador usa o prefixo `comp_` (`comp_sequencial.c`, `comp_fork.c`, `comp_pthreads.c`, `comp_openmp.c`), com a parte comum em `comparador.c`/`comparador.h`. Os binários compilados mantêm o mesmo prefixo. Gera binários ELF, só rodam dentro do WSL (não dá duplo-clique no Windows).
 
 ### Bônus pra apresentação: com/sem otimização
 
@@ -87,17 +93,19 @@ Cada execução:
 - avisa quando termina o cálculo e quando começa/termina a escrita do resultado
 - grava o resultado em `resultado_<metodo>.csv` (ex.: `resultado_sequencial.csv`), escrito em paralelo pelo próprio método (fork escreve com fork, pthreads com pthreads, openmp com openmp; sequencial escreve sequencial)
 
+Os 4 `cod_*` travam cada worker num núcleo fixo (afinidade de CPU, `preparar_afinidade`/`fixar_worker` em `matriz.c`): primeiro um por núcleo físico (CPUs 0, 2, 4, …), depois as irmãs de SMT. O sequencial fica na CPU 0. Isso tira a migração entre núcleos dentro do Linux, mas no WSL2 o Windows ainda escalona as CPUs virtuais, então o tempo continua variando entre execuções: rodar cada caso várias vezes e anotar a mediana (ou o mínimo), com o notebook na tomada e em modo de alto desempenho.
+
 Todos os binários paralelos (`cod_*` e `comp_*`) perguntam ao iniciar `Numero de threads (Enter = 16):` (ou `Numero de processos` no fork). Digitar o número (testes: 2, 4, 8, 16) e Enter; Enter vazio usa um por núcleo. A pergunta acontece antes da leitura dos CSVs, fora do tempo medido. Também dá pra passar direto como argumento, sem pergunta (ex.: `./cod_openmp 4`), útil pra rodar em sequência num script.
 
 ## 4. Verificar corretude (comparador paralelo)
 
-Depois de rodar as 4 versões com o mesmo N, rodar um dos comparadores (qualquer um; dá pra rodar os três e comparar o tempo deles também):
+Depois de rodar as 4 versões com o mesmo N, rodar um dos comparadores (qualquer um; dá pra rodar os quatro e comparar o tempo deles também):
 
 ```
 wsl bash -c "cd /mnt/c/Trabalho1_Programacao_Paralela && ./comp_openmp"
 ```
 
-Troca por `./comp_fork` ou `./comp_pthreads`. Toma `resultado_sequencial.csv` como referência e compara os outros três contra ele, célula a célula. Saída esperada:
+Troca por `./comp_sequencial`, `./comp_fork` ou `./comp_pthreads`. O `comp_sequencial` não pergunta número de threads: faz a mesma comparação numa passada só, e serve de baseline pro tempo dos três paralelos. Toma `resultado_sequencial.csv` como referência e compara os outros três contra ele, célula a célula. Saída esperada:
 
 ```
 Comparador OpenMP (16 threads): 3 resultados 1000x1000 vs sequencial -> tempo de comparacao: 0.007246 s
@@ -111,4 +119,27 @@ Se algum método divergir, aparece `DIVERGENTE` (quantas células e a primeira p
 
 ## 5. Testes de desempenho
 
-Preencher `matriz_a.csv`/`matriz_b.csv` com matrizes N×N geradas (N = 300, 500, 1000, 1500, 2000 — ver ADR), rodar cada uma das 4 versões (compiladas com `-O2`, seção 2), conferir com o comparador (seção 4), anotar o tempo impresso no terminal. Comparação é manual (sem script), então anotar os tempos numa tabela à parte pra apresentação. Opcionalmente, repetir com os binários `_o0` (seção "Bônus") pra comparar também o efeito da otimização do compilador.
+Preencher `matriz_a.csv`/`matriz_b.csv` com matrizes N×N geradas (N = 1000, 2000, 3000, 4000 — ver ADR), rodar cada uma das 4 versões (compiladas com `-O2`, seção 2), conferir com o comparador (seção 4), anotar o tempo impresso no terminal (ou usar a bateria automática abaixo). A análise e as métricas de comparação são montadas à mão, numa tabela à parte pra apresentação. Opcionalmente, repetir com os binários `_o0` (seção "Bônus") pra comparar também o efeito da otimização do compilador.
+
+### Bateria automática (`rodar_testes.sh`)
+
+Roda tudo de uma vez e guarda o comando e a saída de cada execução:
+
+```
+wsl bash rodar_testes.sh              # N = 1000, 2000, 3000, 4000
+wsl bash rodar_testes.sh 1000 2000    # só os tamanhos indicados
+wsl env REPETICOES=3 bash rodar_testes.sh  # outra quantidade de repetições (padrão 5)
+```
+
+Cada configuração (programa + threads + N) roda 5 vezes, e o tempo considerado é a **mediana**, pra diminuir o efeito da variação entre execuções.
+
+Pra cada N: gera as matrizes com `gerar_matriz.py`, roda `cod_sequencial` e depois `cod_fork`, `cod_pthreads` e `cod_openmp` com 2, 4, 8 e 16 threads. Quando as multiplicações de todos os N terminam, roda `comp_sequencial` e depois `comp_fork`, `comp_pthreads` e `comp_openmp` com 2, 4, 8 e 16 threads, sobre os resultados de cada N. Os comparadores conferem os `resultado_*.csv` da última execução de cada método, a de 16 threads (última repetição).
+
+Saída em `testes/`:
+- `testes-matriz-1k.txt`, `-2k`, `-3k`, `-4k`: multiplicações
+- `testes-comparador-1k.txt`, …: comparadores
+- `resumo.csv`: uma linha por configuração (fase, N, programa, threads, mediana/mín/máx do tempo medido pelo programa, mediana do tempo total do processo, execuções com erro, lista dos 5 tempos), pra abrir numa planilha
+- `execucoes.csv`: uma linha por execução individual
+- nos `.txt`, cada execução aparece com `PROMPT: $ ./cod_fork 4   [execucao 3 de 5]` e a saída; depois das 5 vem um bloco `RESUMO` com os tempos e a mediana
+
+As matrizes e os resultados ficam em `~/trabalho1_testes/N<n>` dentro do WSL, fora do projeto. Os `matriz_a.csv`/`matriz_b.csv` da raiz não são tocados. N = 4000 ocupa uns 700 MB e é o mais demorado (o sequencial sozinho leva perto de 1 min). Depois dá pra apagar com `wsl rm -rf ~/trabalho1_testes`.

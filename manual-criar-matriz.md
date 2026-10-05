@@ -40,7 +40,7 @@ Abrir `matriz_a.csv`/`matriz_b.csv` num editor de texto e digitar os valores: um
 4,8,2
 ```
 
-Útil pra matrizes pequenas de teste (2×2, 3×3, 4×4), conferíveis de cabeça. Pros testes de desempenho (N = 300, 500, 1000, 1500, 2000), usar a Opção 1.
+Útil pra matrizes pequenas de teste (2×2, 3×3, 4×4), conferíveis de cabeça. Pros testes de desempenho (N = 1000, 2000, 3000, 4000), usar a Opção 1 ou a bateria automática `rodar_testes.sh` (ver `manual-rodar.md`).
 
 ## Depois de gerar
 

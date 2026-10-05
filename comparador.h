@@ -2,7 +2,8 @@
 #define COMPARADOR_H
 
 /* Parte comum do comparador paralelo de resultados (comp_fork.c,
-   comp_pthreads.c, comp_openmp.c).
+   comp_pthreads.c, comp_openmp.c, e a versao sem paralelismo
+   comp_sequencial.c).
 
    Ideia: o resultado do sequencial e a referencia. Os outros 3 CSVs
    (fork, pthreads, openmp) sao comparados celula a celula contra ele.

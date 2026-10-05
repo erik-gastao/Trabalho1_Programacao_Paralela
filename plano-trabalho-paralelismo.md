@@ -41,9 +41,10 @@ Além das métricas de tempo, um comparador em C, também paralelo, confere se a
 - Toma `resultado_sequencial.csv` como referência e compara `resultado_fork.csv`, `resultado_pthreads.csv` e `resultado_openmp.csv` contra ela, célula a célula (tolerância 1e-9 relativa + absoluta).
 - As linhas são divididas em blocos contíguos entre os workers, igual à multiplicação; cada worker conta as divergências do seu bloco e as contagens são juntadas no final.
 - Implementado nas três ferramentas: `comp_fork.c` (contagens voltam por mmap), `comp_pthreads.c` (junção manual após join), `comp_openmp.c` (cláusula `reduction`). Parte comum em `comparador.h`/`comparador.c`.
+- Versão sequencial do comparador, `comp_sequencial.c`: mesma comparação e mesmo relatório, numa passada só sem divisão em blocos; baseline de tempo para os três comparadores paralelos.
 - Reporta, para cada método: OK, divergente (quantas células e a primeira), dimensão errada ou arquivo não encontrado. Mede o próprio tempo de comparação.
 
-Os testes de desempenho são feitos com N = 300, 500, 1000, 1500 e 2000; o comparador deve dar "consistente" em cada N antes de os tempos serem considerados válidos.
+Os testes de desempenho são feitos com N = 1000, 2000, 3000 e 4000; o comparador deve dar "consistente" em cada N antes de os tempos serem considerados válidos.
 
 ## Comparação a ser feita
 
@@ -65,7 +66,7 @@ Os testes de desempenho são feitos com N = 300, 500, 1000, 1500 e 2000; o compa
 ## Pontos decididos
 
 - [x] Estratégia de divisão do trabalho: por linha, em blocos contíguos (ver seção "Ferramentas de paralelismo")
-- [x] Tamanhos (N) de matriz para os testes de desempenho: 300, 500, 1000, 1500, 2000
+- [x] Tamanhos (N) de matriz para os testes de desempenho: 1000, 2000, 3000, 4000
 - [x] Quantidade de workers nos testes: 1 (sequencial), 2, 4, 8, 16 processos/threads (pedido no terminal ao executar)
 - [x] Verificação de corretude: comparador paralelo em C (ver seção "Verificação de corretude")
 - [x] Grupo: 1 integrante (Erik)

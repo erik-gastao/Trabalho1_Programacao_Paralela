@@ -101,6 +101,7 @@ int main(int argc, char *argv[]) {
 
     Bloco *blocos = malloc(num_processos * sizeof(Bloco));
     dividir_em_blocos(linhas_c, num_processos, blocos);
+    preparar_afinidade();
 
     /* Esvazia o buffer do stdout antes de duplicar o processo; senao cada
        filho herdaria texto pendente e poderia imprimi-lo de novo. */
@@ -116,6 +117,7 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
         if (pid == 0) {
+            fixar_worker(p);   /* cada filho trava no seu nucleo */
             multiplicar_bloco(a, b, buffer_c, blocos[p].inicio, blocos[p].fim, colunas_c);
             _exit(0);
         }
